@@ -11,7 +11,13 @@
 #include "unit.hpp"
 
 static bool isString(const std::string& toTest) {
-	return toTest.size() > 1;
+	return toTest.size() >= 1;
+}
+
+UNITTEST(isStringTest) {
+	AS_T(isString("h"));
+	AS_T(isString("hello"));
+	AS_F(isString(""));
 }
 
 static bool convertsToFloat(const std::string& s, double& ret) {
@@ -137,12 +143,60 @@ std::shared_ptr<object> jsonparser::getRoot() {
 	return this->root;
 }
 
-std::shared_ptr<value> object::access(const std::string& path) {
-	size_t pos = 0;
-	size_t npos = path.size();
-	while(pos != npos) {
-		size_t npos = path.find('.');
+std::shared_ptr<value> object::access(const std::string& path) const {
+	size_t pos = path.find('.');
+	auto pathSubString(path.substr(0,pos));
+	auto ret = this->mappings.find(pathSubString);
+	if(ret == this->mappings.end()) {
+		throw std::logic_error(std::string("Path not present ") + path);
+	} else if(pos <= path.size()) {
+		if(ret->second->getType() != value::type_object) {
+			throw std::logic_error(std::string("Path ") + path + std::string(
+				" did not lead to an object"));
+		} else {
+			return ret->second->getObject()->access(
+				path.substr(pos+1,path.size())
+			);
+		}
+	} else {
+		return ret->second;
 	}
+}
+
+bool object::pathExists(const std::string& path) const {
+	try {
+		auto ret = this->access(path);
+	} catch(...) {
+		return false;
+	}
+	return true;
+}
+
+UNITTEST(accessTest1) {
+	std::string input = "{ \"o\" : { \"b\" : { \"c\" : \"2\" } } } ";
+	std::vector<std::string> tokens;
+	tokenize(input, tokens);
+	jsonparser p(tokens);
+	auto v = p.parseObject();
+	AS_T(v->pathExists("o.b.c"));
+	auto two = v->access("o.b.c");
+	AS_EQ(two->getString(), "2");
+}
+
+UNITTEST(accessTest2) {
+	std::string input = "{ \"o\" : { \"b\" : { \"c\" : \"2\" } } } ";
+	std::vector<std::string> tokens;
+	tokenize(input, tokens);
+	jsonparser p(tokens);
+	auto v = p.parseObject();
+	AS_F(v->pathExists("o.b.z"));
+	bool hasThrown = false;
+	try {
+		auto two = v->access("o.b.z");
+	} catch(std::logic_error& e) {
+		hasThrown = true;
+	}
+	AS_T(hasThrown);
 }
 
 void object::print(std::ostream& s, size_t in) {
@@ -162,7 +216,7 @@ void object::print(std::ostream& s, size_t in) {
 	for(size_t i = 0; i < in; i++) {
 		s<<"    ";
 	}
-	s<<"}";
+
 	s<<std::endl;
 }
 

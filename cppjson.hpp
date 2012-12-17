@@ -19,7 +19,10 @@ public:
 	std::unordered_map<std::string,std::shared_ptr<value>>& getMappings();
 	/** Given a dot separated path this function returns a corresponding
 	 * value. */
-	std::shared_ptr<value> access(const std::string&);
+	std::shared_ptr<value> access(const std::string&) const;
+
+	/** This can be used to check weather or not a path exists. */
+	bool pathExists(const std::string&) const;
 	void print(std::ostream&, size_t);
 };
 
